@@ -1,98 +1,158 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Link } from "expo-router";
+import { useEffect, useState } from "react";
+import {
+  FlatList,
+  Image,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+interface Pokemon {
+  name: string;
+  image: string;
+  types: PokemonType[];
+}
+
+interface PokemonType {
+  type: {
+    name: string;
+  };
+}
+
+const colorsByType: Record<string, string> = {
+  grass: "#48D0B0",
+  fire: "#FB6C6C",
+  water: "#76BEFE",
+  electric: "#FFD86F",
+  bug: "#A8B820",
+  normal: "#A8A77A",
+};
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const [pokemons, setPokemons] = useState<Pokemon[]>([]);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  useEffect(() => {
+    fetchPokemon();
+  }, []);
+
+  const fetchPokemon = async () => {
+    const response = await fetch(
+      "https://pokeapi.co/api/v2/pokemon/?limit=1000"
+    );
+    const data = await response.json();
+
+    const detailed = await Promise.all(
+      data.results.map(async (pokemon: any) => {
+        const res = await fetch(pokemon.url);
+        const details = await res.json();
+
+        return {
+          name: pokemon.name,
+          image:
+            details.sprites.other["official-artwork"]
+              .front_default,
+          types: details.types,
+        };
+      })
+    );
+
+    setPokemons(detailed);
+  };
+
+  return (
+    <FlatList
+      data={pokemons}
+      numColumns={2}
+      keyExtractor={(item) => item.name}
+      contentContainerStyle={styles.container}
+      columnWrapperStyle={{ justifyContent: "space-between" }}
+      renderItem={({ item }) => {
+        const primaryType = item.types[0]?.type.name;
+        const bgColor =
+          colorsByType[primaryType] || "#999";
+
+        return (
+          <Link
+            href={{
+              pathname: "/details",
+              params: { name: item.name },
+            }}
+            style={[
+              styles.card,
+              { backgroundColor: bgColor },
+            ]}
+          >
+            <View style={styles.cardInner}>
+              <Text style={styles.name}>
+                {item.name}
+              </Text>
+
+              <View style={styles.typeBadge}>
+                <Text style={styles.typeText}>
+                  {primaryType}
+                </Text>
+              </View>
+
+              <Image
+                source={{ uri: item.image }}
+                style={styles.image}
+              />
+            </View>
+          </Link>
+        );
+      }}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    padding: 16,
+    backgroundColor: "#f2f2f2",
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+
+  card: {
+    width: "48%",
+    height: 170,
+    borderRadius: 22,
+    padding: 15,
+    marginBottom: 16,
+    overflow: "hidden",
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+
+  cardInner: {
+    flex: 1,
+    position: "relative",
+  },
+
+  name: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#fff",
+    textTransform: "capitalize",
+  },
+
+  typeBadge: {
+    marginTop: 6,
+    backgroundColor: "rgba(255,255,255,0.25)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    alignSelf: "flex-start",
+  },
+
+  typeText: {
+    color: "#fff",
+    fontSize: 12,
+    textTransform: "capitalize",
+  },
+
+  image: {
+    width: 110,
+    height: 110,
+    position: "absolute",
+    bottom: -100,
+    right: -40,
   },
 });
